@@ -31,14 +31,37 @@ public class MainFrame extends JFrame {
 
         JMenuBar menuBar = new JMenuBar();
         JMenu fileMenu = new JMenu("File");
+        JMenu modeConversionMenu = new JMenu("Conversion");
+        JMenu imageEnhancementMenu = new JMenu("Enhancement");
+        JMenu imageCompression = new JMenu("Compression");
         setJMenuBar(menuBar);
 
-        JMenuItem selectFile = new JMenuItem("Select BMP File");
-        JMenuItem saveFile = new JMenuItem("Save As...");
+        JMenuItem selectFile = new JMenuItem("Select a BMP File");
+        JMenuItem saveFile = new JMenuItem("Save the Processed Image As...");
         fileMenu.add(selectFile);
         fileMenu.add(saveFile);
 
+        JMenuItem g2bConversion = new JMenuItem("Gray to Binary");
+        JMenuItem color2gConversion = new JMenuItem("Color to Gray");
+        modeConversionMenu.add(g2bConversion);
+        modeConversionMenu.add(color2gConversion);
+
+        JMenuItem histogramEqualization = new JMenuItem("Histogram Equalization");
+        imageEnhancementMenu.add(histogramEqualization);
+
+        JMenuItem losslessCoding = new JMenuItem("Lossless Predictive Coding");
+        JMenuItem uniformQuantization = new JMenuItem("Uniform Quantization");
+        JMenuItem DCTTransform = new JMenuItem("DCT Transformation");
+        JMenuItem DCTInverseTransform = new JMenuItem("DCT Inverse Transformation");
+        imageCompression.add(losslessCoding);
+        imageCompression.add(uniformQuantization);
+        imageCompression.add(DCTTransform);
+        imageCompression.add(DCTInverseTransform);
+
         menuBar.add(fileMenu);
+        menuBar.add(modeConversionMenu);
+        menuBar.add(imageEnhancementMenu);
+        menuBar.add(imageCompression);
         menuPanel.add(menuBar);
         centerPanel.setLayout(new BorderLayout());
         centerPanel.add(originalImageLabel, BorderLayout.WEST);
@@ -65,6 +88,27 @@ public class MainFrame extends JFrame {
                     originalImageLabel.setIcon(imageIcon);
                     processedImageLabel.setIcon(imageIcon);
                 }
+            }
+        });
+
+        saveFile.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+
+            }
+        });
+
+        g2bConversion.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+
+            }
+        });
+
+        color2gConversion.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+
             }
         });
 
