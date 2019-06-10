@@ -1,4 +1,6 @@
-package com.nostalgia.image_io.util;
+package com.nostalgia.image_io.process;
+
+import com.nostalgia.image_io.util.*;
 
 public class Histogram {
     public static final BMPImage histogram(BMPImage bmpFile, int type) {

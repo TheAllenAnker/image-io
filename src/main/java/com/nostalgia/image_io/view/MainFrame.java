@@ -1,9 +1,11 @@
 package com.nostalgia.image_io.view;
 
+import com.nostalgia.image_io.process.Compression;
+import com.nostalgia.image_io.process.DCTTransformation;
 import com.nostalgia.image_io.process.ModeConversion;
 import com.nostalgia.image_io.util.BMPImage;
 import com.nostalgia.image_io.util.BMPReader;
-import com.nostalgia.image_io.util.Histogram;
+import com.nostalgia.image_io.process.Histogram;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
@@ -67,14 +69,16 @@ public class MainFrame extends JFrame {
         imageEnhancementMenu.add(rgbHSIEqualization);
         imageEnhancementMenu.add(rgbYCbCrEqualization);
 
-        final JMenuItem losslessCoding = new JMenuItem("Lossless Predictive Coding");
+        final JMenuItem losslessEncoding = new JMenuItem("Lossless Predictive Coding");
         final JMenuItem uniformQuantization = new JMenuItem("Uniform Quantization");
         final JMenuItem DCTTransform = new JMenuItem("DCT Transformation");
         final JMenuItem DCTInverseTransform = new JMenuItem("DCT Inverse Transformation");
-        imageCompression.add(losslessCoding);
+        final JMenuItem DCTInverseTransformDrop50p = new JMenuItem("DCT Inverse Transformation Drop 50%");
+        imageCompression.add(losslessEncoding);
         imageCompression.add(uniformQuantization);
         imageCompression.add(DCTTransform);
         imageCompression.add(DCTInverseTransform);
+        imageCompression.add(DCTInverseTransformDrop50p);
 
         g2bConversion.setEnabled(false);
         g2bDitherConversion.setEnabled(false);
@@ -84,10 +88,11 @@ public class MainFrame extends JFrame {
         histogramEqualization.setEnabled(false);
         rgbHSIEqualization.setEnabled(false);
         rgbYCbCrEqualization.setEnabled(false);
-        losslessCoding.setEnabled(false);
+        losslessEncoding.setEnabled(false);
         uniformQuantization.setEnabled(false);
         DCTTransform.setEnabled(false);
         DCTInverseTransform.setEnabled(false);
+        DCTInverseTransformDrop50p.setEnabled(false);
 
         menuBar.add(fileMenu);
         menuBar.add(modeConversionMenu);
@@ -119,10 +124,11 @@ public class MainFrame extends JFrame {
                         histogramEqualization.setEnabled(isGrey);
                         rgbHSIEqualization.setEnabled(!isGrey);
                         rgbYCbCrEqualization.setEnabled(!isGrey);
-                        losslessCoding.setEnabled(true);
+                        losslessEncoding.setEnabled(true);
                         uniformQuantization.setEnabled(true);
                         DCTTransform.setEnabled(true);
                         DCTInverseTransform.setEnabled(true);
+                        DCTInverseTransformDrop50p.setEnabled(true);
                     } catch (IOException e1) {
                         e1.printStackTrace();
                     }
@@ -175,8 +181,8 @@ public class MainFrame extends JFrame {
                 confirmBtn.addActionListener(new ActionListener() {
                     public void actionPerformed(ActionEvent e) {
                         BMPImage img = BMPReader.readBmp(selectedBmpPath);
-                        String matrixSizeText = thresholdValue.getText();
-                        BMPImage newImg = ModeConversion.g2bThreshold(img, Integer.parseInt(matrixSizeText));
+                        BMPImage newImg = ModeConversion.g2bThreshold(img,
+                                Integer.parseInt(thresholdValue.getText()));
                         Image resultImg = null;
                         if (savePath != null && BMPReader.writeBmp(newImg, savePath, "threshold_result")) {
                             String dstImg = savePath + "/threshold_result.bmp";
@@ -249,8 +255,8 @@ public class MainFrame extends JFrame {
                 confirmBtn.addActionListener(new ActionListener() {
                     public void actionPerformed(ActionEvent e) {
                         BMPImage img = BMPReader.readBmp(selectedBmpPath);
-                        String ditherMatrixText = ditherMatrixTextField.getText();
-                        BMPImage newImg = ModeConversion.g2bDither(img, Integer.parseInt(ditherMatrixText));
+                        BMPImage newImg = ModeConversion.g2bDither(img,
+                                Integer.parseInt(ditherMatrixTextField.getText()));
                         Image resultImg = null;
                         if (savePath != null && BMPReader.writeBmp(newImg, savePath, "dither_result")) {
                             String dstImg = savePath + "/dither_result.bmp";
@@ -323,8 +329,8 @@ public class MainFrame extends JFrame {
                 confirmBtn.addActionListener(new ActionListener() {
                     public void actionPerformed(ActionEvent e) {
                         BMPImage img = BMPReader.readBmp(selectedBmpPath);
-                        String ditherMatrixText = orderedDitherMatrixTextField.getText();
-                        BMPImage newImg = ModeConversion.g2bOrderDither(img, Integer.parseInt(ditherMatrixText));
+                        BMPImage newImg = ModeConversion.g2bOrderDither(img,
+                                Integer.parseInt(orderedDitherMatrixTextField.getText()));
                         Image resultImg = null;
                         if (savePath != null && BMPReader.writeBmp(newImg, savePath, "ordered_dither_result")) {
                             String dstImg = savePath + "/ordered_dither_result.bmp";
@@ -678,6 +684,367 @@ public class MainFrame extends JFrame {
                 tmpF.setLocationRelativeTo(null);
                 tmpF.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
                 tmpF.setVisible(true);
+            }
+        });
+
+        losslessEncoding.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                final JFrame tmpFrame = new JFrame("Lossless Predictive Encoding");
+                tmpFrame.setLayout(null);
+                tmpFrame.setBounds(0, 0, 200, 150);
+
+                JLabel pathChooseLabel = new JLabel("请选择存储地址:");
+                pathChooseLabel.setBounds(0, 10, 100, 20);
+                JButton choosePathBtn = new JButton("选择路径");
+                choosePathBtn.setBounds(100, 10, 100, 20);
+
+                final JTextField predictionCoefficientTextField = new JTextField();
+                predictionCoefficientTextField.setBounds(100, 40, 100, 20);
+                JLabel predictionCoefficientLabel = new JLabel("请输入预测系数:");
+                predictionCoefficientLabel.setBounds(0, 40, 100, 20);
+
+                choosePathBtn.addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        // choose a local path to output the processed image
+                        JFileChooser pathChooser = new JFileChooser();
+                        pathChooser.setCurrentDirectory(new File("."));
+                        pathChooser.setDialogTitle("请选择图片存储路径");
+                        pathChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+                        pathChooser.setAcceptAllFileFilterUsed(false);
+                        if (pathChooser.showOpenDialog(pathChooser) == JFileChooser.APPROVE_OPTION) {
+                            savePath = pathChooser.getCurrentDirectory().getPath();
+                        }
+                    }
+                });
+
+                // confirm button
+                JButton confirmBtn = new JButton("确认");
+                confirmBtn.setBounds(210, 40, 50, 20);
+
+                confirmBtn.addActionListener(new ActionListener() {
+                    public void actionPerformed(ActionEvent e) {
+                        BMPImage img = BMPReader.readBmp(selectedBmpPath);
+                        BMPImage newImg = Compression.predictiveEncoding(img,
+                                Integer.parseInt(predictionCoefficientTextField.getText()));
+                        Image resultImg = null;
+                        if (savePath != null && BMPReader.writeBmp(newImg, savePath, "predictive_encoding_result")) {
+                            String dstImg = savePath + "/predictive_encoding_result.bmp";
+                            File file = new File(dstImg);
+                            try {
+                                resultImg = ImageIO.read(file);
+                            } catch (IOException e1) {
+                                e1.printStackTrace();
+                            }
+                        }
+                        ImageIcon icon = null;
+                        if (resultImg != null) {
+                            icon = new ImageIcon(resultImg);
+                        }
+                        processedImageLabel.setIcon(icon);
+                    }
+                });
+
+                tmpFrame.add(pathChooseLabel);
+                tmpFrame.add(choosePathBtn);
+                tmpFrame.add(predictionCoefficientLabel);
+                tmpFrame.add(predictionCoefficientTextField);
+                tmpFrame.add(confirmBtn);
+
+                tmpFrame.setSize(300, 100);
+                tmpFrame.setLocationRelativeTo(null);
+                tmpFrame.setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+                tmpFrame.setVisible(true);
+            }
+        });
+
+        uniformQuantization.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                final JFrame tmpFrame = new JFrame("Uniform Quantization");
+                tmpFrame.setLayout(null);
+                tmpFrame.setBounds(0, 0, 200, 150);
+
+                JLabel pathChooseLabel = new JLabel("请选择存储地址:");
+                pathChooseLabel.setBounds(0, 10, 100, 20);
+                JButton choosePathBtn = new JButton("选择路径");
+                choosePathBtn.setBounds(100, 10, 100, 20);
+
+                final JTextField compressionRateTextField = new JTextField();
+                compressionRateTextField.setBounds(100, 40, 100, 20);
+                JLabel compressionRateLabel = new JLabel("请输入压缩比:");
+                compressionRateLabel.setBounds(0, 40, 100, 20);
+
+                choosePathBtn.addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        // choose a local path to output the processed image
+                        JFileChooser pathChooser = new JFileChooser();
+                        pathChooser.setCurrentDirectory(new File("."));
+                        pathChooser.setDialogTitle("请选择图片存储路径");
+                        pathChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+                        pathChooser.setAcceptAllFileFilterUsed(false);
+                        if (pathChooser.showOpenDialog(pathChooser) == JFileChooser.APPROVE_OPTION) {
+                            savePath = pathChooser.getCurrentDirectory().getPath();
+                        }
+                    }
+                });
+
+                // confirm button
+                JButton confirmBtn = new JButton("确认");
+                confirmBtn.setBounds(210, 40, 50, 20);
+
+                confirmBtn.addActionListener(new ActionListener() {
+                    public void actionPerformed(ActionEvent e) {
+                        BMPImage img = BMPReader.readBmp(selectedBmpPath);
+                        BMPImage newImg = Compression.uniformQuantization(img,
+                                Integer.parseInt(compressionRateTextField.getText()));
+                        Image resultImg = null;
+                        if (savePath != null && BMPReader.writeBmp(newImg, savePath, "uniform_quantization_result")) {
+                            String dstImg = savePath + "/uniform_quantization_result.bmp";
+                            File file = new File(dstImg);
+                            try {
+                                resultImg = ImageIO.read(file);
+                            } catch (IOException e1) {
+                                e1.printStackTrace();
+                            }
+                        }
+                        ImageIcon icon = null;
+                        if (resultImg != null) {
+                            icon = new ImageIcon(resultImg);
+                        }
+                        processedImageLabel.setIcon(icon);
+                    }
+                });
+
+                tmpFrame.add(pathChooseLabel);
+                tmpFrame.add(choosePathBtn);
+                tmpFrame.add(compressionRateLabel);
+                tmpFrame.add(compressionRateTextField);
+                tmpFrame.add(confirmBtn);
+
+                tmpFrame.setSize(300, 100);
+                tmpFrame.setLocationRelativeTo(null);
+                tmpFrame.setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+                tmpFrame.setVisible(true);
+            }
+        });
+
+        DCTTransform.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                final JFrame tmpFrame = new JFrame("DCT Transform");
+                tmpFrame.setLayout(null);
+                tmpFrame.setBounds(0, 0, 200, 150);
+
+                JLabel pathChooseLabel = new JLabel("请选择存储地址:");
+                pathChooseLabel.setBounds(0, 10, 100, 20);
+                JButton choosePathBtn = new JButton("选择路径");
+                choosePathBtn.setBounds(100, 10, 100, 20);
+
+                final JTextField sectionSizeTextField = new JTextField();
+                sectionSizeTextField.setBounds(100, 40, 100, 20);
+                JLabel sectionSizeLabel = new JLabel("请输入分块大小:");
+                sectionSizeLabel.setBounds(0, 40, 100, 20);
+
+                choosePathBtn.addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        // choose a local path to output the processed image
+                        JFileChooser pathChooser = new JFileChooser();
+                        pathChooser.setCurrentDirectory(new File("."));
+                        pathChooser.setDialogTitle("请选择图片存储路径");
+                        pathChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+                        pathChooser.setAcceptAllFileFilterUsed(false);
+                        if (pathChooser.showOpenDialog(pathChooser) == JFileChooser.APPROVE_OPTION) {
+                            savePath = pathChooser.getCurrentDirectory().getPath();
+                        }
+                    }
+                });
+
+                // confirm button
+                JButton confirmBtn = new JButton("确认");
+                confirmBtn.setBounds(210, 40, 50, 20);
+
+                confirmBtn.addActionListener(new ActionListener() {
+                    public void actionPerformed(ActionEvent e) {
+                        BMPImage img = BMPReader.readBmp(selectedBmpPath);
+                        BMPImage newImg = DCTTransformation.DCTTransform(img,
+                                Integer.parseInt(sectionSizeTextField.getText()));
+                        Image resultImg = null;
+                        if (savePath != null && BMPReader.writeBmp(newImg, savePath, "DCT_transform_result")) {
+                            String dstImg = savePath + "/DCT_transform_result.bmp";
+                            File file = new File(dstImg);
+                            try {
+                                resultImg = ImageIO.read(file);
+                            } catch (IOException e1) {
+                                e1.printStackTrace();
+                            }
+                        }
+                        ImageIcon icon = null;
+                        if (resultImg != null) {
+                            icon = new ImageIcon(resultImg);
+                        }
+                        processedImageLabel.setIcon(icon);
+                    }
+                });
+
+                tmpFrame.add(pathChooseLabel);
+                tmpFrame.add(choosePathBtn);
+                tmpFrame.add(sectionSizeLabel);
+                tmpFrame.add(sectionSizeTextField);
+                tmpFrame.add(confirmBtn);
+
+                tmpFrame.setSize(300, 100);
+                tmpFrame.setLocationRelativeTo(null);
+                tmpFrame.setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+                tmpFrame.setVisible(true);
+            }
+        });
+
+        DCTInverseTransform.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                final JFrame tmpFrame = new JFrame("DCT Transform");
+                tmpFrame.setLayout(null);
+                tmpFrame.setBounds(0, 0, 200, 150);
+
+                JLabel pathChooseLabel = new JLabel("请选择存储地址:");
+                pathChooseLabel.setBounds(0, 10, 100, 20);
+                JButton choosePathBtn = new JButton("选择路径");
+                choosePathBtn.setBounds(100, 10, 100, 20);
+
+                final JTextField sectionSizeTextField = new JTextField();
+                sectionSizeTextField.setBounds(100, 40, 100, 20);
+                JLabel sectionSizeLabel = new JLabel("请输入分块大小:");
+                sectionSizeLabel.setBounds(0, 40, 100, 20);
+
+                choosePathBtn.addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        // choose a local path to output the processed image
+                        JFileChooser pathChooser = new JFileChooser();
+                        pathChooser.setCurrentDirectory(new File("."));
+                        pathChooser.setDialogTitle("请选择图片存储路径");
+                        pathChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+                        pathChooser.setAcceptAllFileFilterUsed(false);
+                        if (pathChooser.showOpenDialog(pathChooser) == JFileChooser.APPROVE_OPTION) {
+                            savePath = pathChooser.getCurrentDirectory().getPath();
+                        }
+                    }
+                });
+
+                // confirm button
+                JButton confirmBtn = new JButton("确认");
+                confirmBtn.setBounds(210, 40, 50, 20);
+
+                confirmBtn.addActionListener(new ActionListener() {
+                    public void actionPerformed(ActionEvent e) {
+                        BMPImage img = BMPReader.readBmp(selectedBmpPath);
+                        BMPImage newImg = DCTTransformation.inverseDCTTransform(img,
+                                Integer.parseInt(sectionSizeTextField.getText()));
+                        Image resultImg = null;
+                        if (savePath != null && BMPReader.writeBmp(newImg, savePath, "DCT_inverse_transform_result")) {
+                            String dstImg = savePath + "/DCT_inverse_transform_result.bmp";
+                            File file = new File(dstImg);
+                            try {
+                                resultImg = ImageIO.read(file);
+                            } catch (IOException e1) {
+                                e1.printStackTrace();
+                            }
+                        }
+                        ImageIcon icon = null;
+                        if (resultImg != null) {
+                            icon = new ImageIcon(resultImg);
+                        }
+                        processedImageLabel.setIcon(icon);
+                    }
+                });
+
+                tmpFrame.add(pathChooseLabel);
+                tmpFrame.add(choosePathBtn);
+                tmpFrame.add(sectionSizeLabel);
+                tmpFrame.add(sectionSizeTextField);
+                tmpFrame.add(confirmBtn);
+
+                tmpFrame.setSize(300, 100);
+                tmpFrame.setLocationRelativeTo(null);
+                tmpFrame.setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+                tmpFrame.setVisible(true);
+            }
+        });
+
+        DCTInverseTransformDrop50p.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                final JFrame tmpFrame = new JFrame("DCT Transform");
+                tmpFrame.setLayout(null);
+                tmpFrame.setBounds(0, 0, 200, 150);
+
+                JLabel pathChooseLabel = new JLabel("请选择存储地址:");
+                pathChooseLabel.setBounds(0, 10, 100, 20);
+                JButton choosePathBtn = new JButton("选择路径");
+                choosePathBtn.setBounds(100, 10, 100, 20);
+
+                final JTextField sectionSizeTextField = new JTextField();
+                sectionSizeTextField.setBounds(100, 40, 100, 20);
+                JLabel sectionSizeLabel = new JLabel("请输入分块大小:");
+                sectionSizeLabel.setBounds(0, 40, 100, 20);
+
+                choosePathBtn.addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        // choose a local path to output the processed image
+                        JFileChooser pathChooser = new JFileChooser();
+                        pathChooser.setCurrentDirectory(new File("."));
+                        pathChooser.setDialogTitle("请选择图片存储路径");
+                        pathChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+                        pathChooser.setAcceptAllFileFilterUsed(false);
+                        if (pathChooser.showOpenDialog(pathChooser) == JFileChooser.APPROVE_OPTION) {
+                            savePath = pathChooser.getCurrentDirectory().getPath();
+                        }
+                    }
+                });
+
+                // confirm button
+                JButton confirmBtn = new JButton("确认");
+                confirmBtn.setBounds(210, 40, 50, 20);
+
+                confirmBtn.addActionListener(new ActionListener() {
+                    public void actionPerformed(ActionEvent e) {
+                        BMPImage img = BMPReader.readBmp(selectedBmpPath);
+                        BMPImage newImg = DCTTransformation.inverseDCTTransformDrop50Percent(img,
+                                Integer.parseInt(sectionSizeTextField.getText()));
+                        Image resultImg = null;
+                        if (savePath != null && BMPReader.writeBmp(newImg, savePath,
+                                "DCT_inverse_transform_drop50_result")) {
+                            String dstImg = savePath + "/DCT_inverse_transform_drop50_result.bmp";
+                            File file = new File(dstImg);
+                            try {
+                                resultImg = ImageIO.read(file);
+                            } catch (IOException e1) {
+                                e1.printStackTrace();
+                            }
+                        }
+                        ImageIcon icon = null;
+                        if (resultImg != null) {
+                            icon = new ImageIcon(resultImg);
+                        }
+                        processedImageLabel.setIcon(icon);
+                    }
+                });
+
+                tmpFrame.add(pathChooseLabel);
+                tmpFrame.add(choosePathBtn);
+                tmpFrame.add(sectionSizeLabel);
+                tmpFrame.add(sectionSizeTextField);
+                tmpFrame.add(confirmBtn);
+
+                tmpFrame.setSize(300, 100);
+                tmpFrame.setLocationRelativeTo(null);
+                tmpFrame.setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+                tmpFrame.setVisible(true);
             }
         });
 
