@@ -3,6 +3,7 @@ package com.nostalgia.image_io.view;
 import com.nostalgia.image_io.process.ModeConversion;
 import com.nostalgia.image_io.util.BMPImage;
 import com.nostalgia.image_io.util.BMPReader;
+import com.nostalgia.image_io.util.Histogram;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
@@ -46,9 +47,7 @@ public class MainFrame extends JFrame {
         setJMenuBar(menuBar);
 
         final JMenuItem selectFile = new JMenuItem("Select a BMP File");
-        final JMenuItem saveFile = new JMenuItem("Save the Processed Image As...");
         fileMenu.add(selectFile);
-        fileMenu.add(saveFile);
 
         final JMenuItem g2bConversion = new JMenuItem("Gray to Binary Threshold");
         final JMenuItem g2bDitherConversion = new JMenuItem("Gray to Binary Dither");
@@ -61,8 +60,12 @@ public class MainFrame extends JFrame {
         modeConversionMenu.add(colorHSIConversion);
         modeConversionMenu.add(colorYCbCrConversion);
 
-        final JMenuItem histogramEqualization = new JMenuItem("Histogram Equalization");
+        final JMenuItem histogramEqualization = new JMenuItem("Histogram Equalization for Greyscale Image");
+        final JMenuItem rgbHSIEqualization = new JMenuItem("RGB -- HSI Equalization");
+        final JMenuItem rgbYCbCrEqualization = new JMenuItem("RGB -- YCbCr Equalization");
         imageEnhancementMenu.add(histogramEqualization);
+        imageEnhancementMenu.add(rgbHSIEqualization);
+        imageEnhancementMenu.add(rgbYCbCrEqualization);
 
         final JMenuItem losslessCoding = new JMenuItem("Lossless Predictive Coding");
         final JMenuItem uniformQuantization = new JMenuItem("Uniform Quantization");
@@ -73,13 +76,14 @@ public class MainFrame extends JFrame {
         imageCompression.add(DCTTransform);
         imageCompression.add(DCTInverseTransform);
 
-        saveFile.setEnabled(false);
         g2bConversion.setEnabled(false);
         g2bDitherConversion.setEnabled(false);
         g2bOrderedDitherConversion.setEnabled(false);
         colorHSIConversion.setEnabled(false);
         colorYCbCrConversion.setEnabled(false);
         histogramEqualization.setEnabled(false);
+        rgbHSIEqualization.setEnabled(false);
+        rgbYCbCrEqualization.setEnabled(false);
         losslessCoding.setEnabled(false);
         uniformQuantization.setEnabled(false);
         DCTTransform.setEnabled(false);
@@ -107,13 +111,14 @@ public class MainFrame extends JFrame {
                         // determine if the selected image is a greyscale image of not
                         Raster raster = ImageIO.read(imageFile).getRaster();
                         isGrey = raster.getNumDataElements() == 1;
-                        saveFile.setEnabled(true);
                         g2bConversion.setEnabled(isGrey);
                         g2bDitherConversion.setEnabled(isGrey);
                         g2bOrderedDitherConversion.setEnabled(isGrey);
                         colorHSIConversion.setEnabled(!isGrey);
                         colorYCbCrConversion.setEnabled(!isGrey);
-                        histogramEqualization.setEnabled(true);
+                        histogramEqualization.setEnabled(isGrey);
+                        rgbHSIEqualization.setEnabled(!isGrey);
+                        rgbYCbCrEqualization.setEnabled(!isGrey);
                         losslessCoding.setEnabled(true);
                         uniformQuantization.setEnabled(true);
                         DCTTransform.setEnabled(true);
@@ -128,13 +133,6 @@ public class MainFrame extends JFrame {
                     originalImageLabel.setIcon(imageIcon);
                     processedImageLabel.setIcon(imageIcon);
                 }
-            }
-        });
-
-        saveFile.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-
             }
         });
 
@@ -462,6 +460,201 @@ public class MainFrame extends JFrame {
                         Image resultImg = null;
                         if (savePath != null && BMPReader.writeBmp(newImg, savePath, "YCbCr_result")) {
                             String dstImg = savePath + "/YCbCr_result.bmp";
+                            File file = new File(dstImg);
+                            try {
+                                resultImg = ImageIO.read(file);
+                            } catch (IOException e1) {
+                                e1.printStackTrace();
+                            }
+                        }
+                        ImageIcon icon = null;
+                        if (resultImg != null) {
+                            icon = new ImageIcon(resultImg);
+                        }
+                        processedImageLabel.setIcon(icon);
+                    }
+                });
+
+                tmpF.add(pathChooseLabel);
+                tmpF.add(choosePathBtn);
+                tmpF.add(confirmBtn);
+
+                tmpF.setSize(300, 100);
+                tmpF.setLocationRelativeTo(null);
+                tmpF.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+                tmpF.setVisible(true);
+            }
+        });
+
+        histogramEqualization.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                JFrame tmpF = new JFrame("Histogram Equalization for Grey Image");
+                tmpF.setLayout(null);
+                tmpF.setBounds(0, 0, 200, 150);
+
+                // path chooser
+                JLabel pathChooseLabel = new JLabel("请选择存储地址:");
+                pathChooseLabel.setBounds(0, 10, 100, 20);
+                JButton choosePathBtn = new JButton("选择路径");
+                choosePathBtn.setBounds(100, 10, 100, 20);
+
+                choosePathBtn.addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        // choose a local path to output the processed image
+                        JFileChooser pathChooser = new JFileChooser();
+                        pathChooser.setCurrentDirectory(new File("."));
+                        pathChooser.setDialogTitle("请选择图片存储路径");
+                        pathChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+                        pathChooser.setAcceptAllFileFilterUsed(false);
+                        if (pathChooser.showOpenDialog(pathChooser) == JFileChooser.APPROVE_OPTION) {
+                            savePath = pathChooser.getCurrentDirectory().getPath();
+                        }
+                    }
+                });
+
+                // confirm button
+                JButton confirmBtn = new JButton("确认");
+                confirmBtn.setBounds(210, 40, 50, 20);
+
+                confirmBtn.addActionListener(new ActionListener() {
+                    public void actionPerformed(ActionEvent e) {
+                        BMPImage img = BMPReader.readBmp(selectedBmpPath);
+                        BMPImage newImg = Histogram.histogram(img, 0);
+                        Image resultImg = null;
+                        if (savePath != null && BMPReader.writeBmp(newImg, savePath, "histogram_result")) {
+                            String dstImg = savePath + "/histogram_result.bmp";
+                            File file = new File(dstImg);
+                            try {
+                                resultImg = ImageIO.read(file);
+                            } catch (IOException e1) {
+                                e1.printStackTrace();
+                            }
+                        }
+                        ImageIcon icon = null;
+                        if (resultImg != null) {
+                            icon = new ImageIcon(resultImg);
+                        }
+                        processedImageLabel.setIcon(icon);
+                    }
+                });
+
+                tmpF.add(pathChooseLabel);
+                tmpF.add(choosePathBtn);
+                tmpF.add(confirmBtn);
+
+                tmpF.setSize(300, 100);
+                tmpF.setLocationRelativeTo(null);
+                tmpF.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+                tmpF.setVisible(true);
+            }
+        });
+
+        rgbHSIEqualization.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                JFrame tmpF = new JFrame("Histogram Equalization for Color Image HSI");
+                tmpF.setLayout(null);
+                tmpF.setBounds(0, 0, 200, 150);
+
+                // path chooser
+                JLabel pathChooseLabel = new JLabel("请选择存储地址:");
+                pathChooseLabel.setBounds(0, 10, 100, 20);
+                JButton choosePathBtn = new JButton("选择路径");
+                choosePathBtn.setBounds(100, 10, 100, 20);
+
+                choosePathBtn.addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        // choose a local path to output the processed image
+                        JFileChooser pathChooser = new JFileChooser();
+                        pathChooser.setCurrentDirectory(new File("."));
+                        pathChooser.setDialogTitle("请选择图片存储路径");
+                        pathChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+                        pathChooser.setAcceptAllFileFilterUsed(false);
+                        if (pathChooser.showOpenDialog(pathChooser) == JFileChooser.APPROVE_OPTION) {
+                            savePath = pathChooser.getCurrentDirectory().getPath();
+                        }
+                    }
+                });
+
+                // confirm button
+                JButton confirmBtn = new JButton("确认");
+                confirmBtn.setBounds(210, 40, 50, 20);
+
+                confirmBtn.addActionListener(new ActionListener() {
+                    public void actionPerformed(ActionEvent e) {
+                        BMPImage img = BMPReader.readBmp(selectedBmpPath);
+                        BMPImage newImg = Histogram.histogram(img, 1);
+                        Image resultImg = null;
+                        if (savePath != null && BMPReader.writeBmp(newImg, savePath, "rgb_hsi_eql_result")) {
+                            String dstImg = savePath + "/rgb_hsi_eql_result.bmp";
+                            File file = new File(dstImg);
+                            try {
+                                resultImg = ImageIO.read(file);
+                            } catch (IOException e1) {
+                                e1.printStackTrace();
+                            }
+                        }
+                        ImageIcon icon = null;
+                        if (resultImg != null) {
+                            icon = new ImageIcon(resultImg);
+                        }
+                        processedImageLabel.setIcon(icon);
+                    }
+                });
+
+                tmpF.add(pathChooseLabel);
+                tmpF.add(choosePathBtn);
+                tmpF.add(confirmBtn);
+
+                tmpF.setSize(300, 100);
+                tmpF.setLocationRelativeTo(null);
+                tmpF.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+                tmpF.setVisible(true);
+            }
+        });
+
+        rgbYCbCrEqualization.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                JFrame tmpF = new JFrame("Histogram Equalization for Color Image YCbCr");
+                tmpF.setLayout(null);
+                tmpF.setBounds(0, 0, 200, 150);
+
+                // path chooser
+                JLabel pathChooseLabel = new JLabel("请选择存储地址:");
+                pathChooseLabel.setBounds(0, 10, 100, 20);
+                JButton choosePathBtn = new JButton("选择路径");
+                choosePathBtn.setBounds(100, 10, 100, 20);
+
+                choosePathBtn.addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        // choose a local path to output the processed image
+                        JFileChooser pathChooser = new JFileChooser();
+                        pathChooser.setCurrentDirectory(new File("."));
+                        pathChooser.setDialogTitle("请选择图片存储路径");
+                        pathChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+                        pathChooser.setAcceptAllFileFilterUsed(false);
+                        if (pathChooser.showOpenDialog(pathChooser) == JFileChooser.APPROVE_OPTION) {
+                            savePath = pathChooser.getCurrentDirectory().getPath();
+                        }
+                    }
+                });
+
+                // confirm button
+                JButton confirmBtn = new JButton("确认");
+                confirmBtn.setBounds(210, 40, 50, 20);
+
+                confirmBtn.addActionListener(new ActionListener() {
+                    public void actionPerformed(ActionEvent e) {
+                        BMPImage img = BMPReader.readBmp(selectedBmpPath);
+                        BMPImage newImg = Histogram.histogram(img, 2);
+                        Image resultImg = null;
+                        if (savePath != null && BMPReader.writeBmp(newImg, savePath, "rgb_ycbcr_eql_result")) {
+                            String dstImg = savePath + "/rgb_ycbcr_eql_result.bmp";
                             File file = new File(dstImg);
                             try {
                                 resultImg = ImageIO.read(file);
